@@ -92,8 +92,8 @@ were chosen on validation records and dev films and written into `skanda_config.
 **The check.** After every pass, a score is computed on dev films and validation records, never on test data:
 0.35 × X-ray balanced accuracy + 0.15 × right finding type + 0.15 × X-ray box recall + 0.20 × CT/MRI balanced
 accuracy + 0.15 × CT/MRI outline recall. A pass is kept when its score is at least the best so far − 0.01.
-Skanda-0 scored 0.616 (run 2's best: 0.598). An earlier run 1 also had a GRPO stage, which made the model call every
-X-ray abnormal; run 2's GRPO stage was dropped by this check, and run 3 did not run one.
+Skanda-0 scored 0.616 (run 2's best: 0.598). An earlier run 1 (3D volumes that all had a lesion, then GRPO) ended with a model
+that called every X-ray abnormal; run 2's GRPO stage was dropped by this check, and run 3 did not run one.
 
 Shared: batch 1 × gradient accumulation 8, AdamW (weight decay 0), OneCycle with 3% warm-up, grad-clip 1.0, bf16
 autocast, gradient checkpointing, images up to 1024² for both Qwen3-VL and SAM 2 (`--max-pixels`), volume slices at
