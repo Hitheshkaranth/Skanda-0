@@ -108,16 +108,38 @@ loss = text cross-entropy (JSON boilerplate tokens × 0.3)
 
 | Stage | Trains | Data | Settings |
 |---|---|---|---|
-| **0 · Connector** | projector, SAM 2 mask decoder, score head | "Outline the *heart / right lung / liver lesion* …" → `[SEG]` | lr 1e-4 |
+| **0 · Connector** | projector, SAM 2 mask decoder | "Outline the *heart / right lung / liver lesion* …" → `[SEG]` | lr 1e-4 |
 | **1 · 2D SFT** | + LoRA on language model and vision encoder, `[SEG]` rows | reports on X-rays and CT/MRI slices, with hint lines | lr 5e-5, r=64 |
 | **2 · 3D volumes** | same | CT/MRI volumes with lesion-free volumes, 40% 2D replay | lr 5e-5 |
 | **3 · X-ray polish** | same | X-ray reports, 15% 3D replay | lr 1.5e-5 |
 
 Batch 1 × accumulation 8, AdamW, OneCycle (3% warm-up), grad-clip 1.0, bf16, gradient checkpointing. SAM 2's frozen
 image encoder runs once into a feature cache (~8 MB per image). Rare findings are drawn more often (inverse
-square-root class frequency). Each stage is kept only if its validation numbers are not worse than the best checkpoint
-so far; reinforcement learning (GRPO) was tried in earlier runs and dropped by that check because it pushed the model to
-call every X-ray abnormal. Skanda-0 is the third training run; each run started from the previous one's best checkpoint.
+square-root class frequency).
+
+### Exact recipe of the published Skanda-0
+
+Skanda-0 is the `polish` checkpoint of the third training run. Its weights went through six training passes in two runs.
+Run 2 started from the base models, and run 3 continued from run 2's final checkpoint. Every pass below was kept by the
+check.
+
+| # | Run | Stage | Started from | Train data | Epochs | lr | Notes |
+|---:|---|---|---|---|---:|---:|---|
+| 1 | 2 | 0 · connector | Qwen3-VL-30B-A3B + Sa2VA's SAM 2 + new projector and score head | outline prompts: ChestX-Det findings and CheXmask lungs/heart; MSD lesions and organs (brain tumour, heart, liver, prostate, lung, pancreas, hepatic vessel, spleen, colon); ISLES 2022; 3,000 prompts for findings that are absent (empty mask) | 2 | 1e-4 | language model frozen |
+| 2 | 2 | 1 · 2D SFT | pass 1 | reports: ChestX-Det, NIH ChestX-ray14, MSD, ISLES 2022, DeepLesion, autoPET | 2 | 5e-5 | LoRA r=64 + vision LoRA, `[SEG]` rows |
+| 3 | 2 | 2 · 3D | pass 2 | MSD, ISLES and autoPET volumes, with and without lesions; 40% 2D replay of pass 2's data | 3 | 5e-5 | |
+| 4 | 3 | 1 · 2D SFT | pass 3 | as pass 2, with X-ray targets rebuilt: one finding + `[SEG]` per radiologist outline, and NIH rare-label films with text-only reports | 1 | 5e-5 | + hint lines (`--hints`) |
+| 5 | 3 | 2 · 3D | pass 4 | as pass 3 | 1 | 5e-5 | hints |
+| 6 | 3 | 3 · X-ray polish | pass 5 | ChestX-Det + NIH reports; 15% replay of the volumes | 1 | 1.5e-5 | hints → **Skanda-0** |
+
+After pass 6, the abnormal-score gate (`skanda/calibrate.py`) and the hint thresholds (`skanda/calibrate_hints.py`)
+were chosen on validation records and dev films and written into `skanda_config.json`.
+
+**The check.** After every pass, a score is computed on dev films and validation records, never on test data:
+0.35 × X-ray balanced accuracy + 0.15 × right finding type + 0.15 × X-ray box recall + 0.20 × CT/MRI balanced
+accuracy + 0.15 × CT/MRI outline recall. A pass is kept when its score is at least the best so far − 0.01.
+Skanda-0 scored 0.616 (run 2's best: 0.598). An earlier run 1 also had a GRPO stage, which made the model call every
+X-ray abnormal; run 2's GRPO stage was dropped by this check, and run 3 did not run one.
 
 Full details: [docs/TRAINING.md](docs/TRAINING.md).
 

@@ -66,10 +66,34 @@ flowchart LR
 
 | Stage | Trains | Data | Skanda-0 settings |
 |---|---|---|---|
-| **0 · connector** | projector, mask decoder, score head | "Outline the *right lung / heart / liver lesion* …" → `[SEG]` (`stage: "connector"` records) | lr 1e-4, 2 epochs |
-| **1 · 2D SFT** | + LoRA (language model and vision encoder), `[SEG]` rows | full reports on X-rays and CT/MRI slices | lr 5e-5, LoRA r=64, 1–2 epochs, `--vision-lora --hints` |
-| **2 · 3D volumes** | same | CT/MRI stacks (33 slices) with 40% 2D replay (`--replay-frac 0.4`) | lr 5e-5, 1–2 epochs |
+| **0 · connector** | projector, mask decoder (the score head has no labels here) | "Outline the *right lung / heart / liver lesion* …" → `[SEG]` (`stage: "connector"` records), plus prompts for absent findings with an empty mask, which teach the object score 0 | lr 1e-4, 2 epochs |
+| **1 · 2D SFT** | + LoRA (language model and vision encoder), `[SEG]` rows | full reports on X-rays and CT/MRI slices | lr 5e-5, LoRA r=64, `--vision-lora`; 2 epochs, then 1 more with `--hints` |
+| **2 · 3D volumes** | same | CT/MRI stacks (33 slices) with 40% 2D replay (`--replay-frac 0.4`) | lr 5e-5; 3 epochs, then 1 more with `--hints` |
 | **3 · X-ray polish** | same | X-ray reports with 15% 3D replay | lr 1.5e-5 (0.3×), 1 epoch |
+
+#### Exact recipe of the published Skanda-0
+
+Skanda-0 is the `polish` checkpoint of the third training run. Its weights went through six training passes in two runs.
+Run 2 started from the base models, and run 3 continued from run 2's final checkpoint. Every pass below was kept by the
+check.
+
+| # | Run | Stage | Started from | Train data | Epochs | lr | Notes |
+|---:|---|---|---|---|---:|---:|---|
+| 1 | 2 | 0 · connector | Qwen3-VL-30B-A3B + Sa2VA's SAM 2 + new projector and score head | outline prompts: ChestX-Det findings and CheXmask lungs/heart; MSD lesions and organs (brain tumour, heart, liver, prostate, lung, pancreas, hepatic vessel, spleen, colon); ISLES 2022; 3,000 prompts for findings that are absent (empty mask) | 2 | 1e-4 | language model frozen |
+| 2 | 2 | 1 · 2D SFT | pass 1 | reports: ChestX-Det, NIH ChestX-ray14, MSD, ISLES 2022, DeepLesion, autoPET | 2 | 5e-5 | LoRA r=64 + vision LoRA, `[SEG]` rows |
+| 3 | 2 | 2 · 3D | pass 2 | MSD, ISLES and autoPET volumes, with and without lesions; 40% 2D replay of pass 2's data | 3 | 5e-5 | |
+| 4 | 3 | 1 · 2D SFT | pass 3 | as pass 2, with X-ray targets rebuilt: one finding + `[SEG]` per radiologist outline, and NIH rare-label films with text-only reports | 1 | 5e-5 | + hint lines (`--hints`) |
+| 5 | 3 | 2 · 3D | pass 4 | as pass 3 | 1 | 5e-5 | hints |
+| 6 | 3 | 3 · X-ray polish | pass 5 | ChestX-Det + NIH reports; 15% replay of the volumes | 1 | 1.5e-5 | hints → **Skanda-0** |
+
+After pass 6, the abnormal-score gate (`skanda/calibrate.py`) and the hint thresholds (`skanda/calibrate_hints.py`)
+were chosen on validation records and dev films and written into `skanda_config.json`.
+
+**The check.** After every pass, a score is computed on dev films and validation records, never on test data:
+0.35 × X-ray balanced accuracy + 0.15 × right finding type + 0.15 × X-ray box recall + 0.20 × CT/MRI balanced
+accuracy + 0.15 × CT/MRI outline recall. A pass is kept when its score is at least the best so far − 0.01.
+Skanda-0 scored 0.616 (run 2's best: 0.598). An earlier run 1 also had a GRPO stage, which made the model call every
+X-ray abnormal; run 2's GRPO stage was dropped by this check, and run 3 did not run one.
 
 Shared: batch 1 × gradient accumulation 8, AdamW (weight decay 0), OneCycle with 3% warm-up, grad-clip 1.0, bf16
 autocast, gradient checkpointing, images up to 1024² for both Qwen3-VL and SAM 2 (`--max-pixels`), volume slices at
@@ -83,8 +107,8 @@ autocast, gradient checkpointing, images up to 1024² for both Qwen3-VL and SAM 
 - **Hints (`--hints`).** X-ray replies start with a short noisy "likely / possible …" line built from the labels
   (`skanda/hints.py`); it is input, not a loss target. At inference the score head writes it (thresholds from
   `skanda/calibrate_hints.py`).
-- **Keep only what helps.** Skanda-0 kept a stage only if its validation numbers were not worse than the best checkpoint
-  so far; GRPO was tried in earlier runs and dropped by that rule.
+- **Keep only what helps.** After every stage Skanda-0 computed one score on dev and validation data and kept the
+  stage only if it was within 0.01 of the best so far (details below).
 - **Resumable.** Every `--ckpt-minutes` (and at each validation) the trainable weights, optimiser and scheduler are
   written atomically to `<out>/ckpt`; re-running the same command continues from there.
 

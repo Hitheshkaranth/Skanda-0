@@ -114,7 +114,7 @@ def skanda0():
     s.append(f'<text x="40" y="{y + 165}" font-size="13" fill="{MUTED}">Loss = report text (cross-entropy, JSON boilerplate × 0.3) + 2 × outline BCE + 0.5 × outline Dice '
              f'+ 0.2 × object-score BCE + 0.5 × score-head BCE.</text>')
     s.append(f'<text x="40" y="{y + 187}" font-size="13" fill="{MUTED}">Blue = frozen · orange = fine-tuned · green = new · pink = the [SEG] path. '
-             f'A stage is kept only if its check on validation data is not worse than the best so far.</text>')
+             f'A stage is kept only if its dev/validation score is within 0.01 of the best so far.</text>')
     s.append("</svg>")
     return "\n".join(s)
 

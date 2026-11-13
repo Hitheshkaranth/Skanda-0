@@ -42,5 +42,5 @@
 <line x1="913" y1="877" x2="926" y2="877" stroke="#6b7280" stroke-width="3" marker-end="url(#a6b7280)"/>
 <rect x="928" y="818" width="280" height="118" rx="14" fill="#fffbeb" stroke="#f59e0b" stroke-width="2"/><text x="942" y="846" font-size="16" font-weight="800" fill="#1f2937">Stage 3 <tspan font-weight="500" fill="#6b7280">· X-ray polish</tspan></text><text x="942" y="874" font-size="13.5" fill="#1f2937">X-ray reports at 0.3× lr,</text><text x="942" y="895" font-size="13.5" fill="#1f2937">15% 3D replay</text>
 <text x="40" y="965" font-size="13" fill="#6b7280">Loss = report text (cross-entropy, JSON boilerplate × 0.3) + 2 × outline BCE + 0.5 × outline Dice + 0.2 × object-score BCE + 0.5 × score-head BCE.</text>
-<text x="40" y="987" font-size="13" fill="#6b7280">Blue = frozen · orange = fine-tuned · green = new · pink = the [SEG] path. A stage is kept only if its check on validation data is not worse than the best so far.</text>
+<text x="40" y="987" font-size="13" fill="#6b7280">Blue = frozen · orange = fine-tuned · green = new · pink = the [SEG] path. A stage is kept only if its dev/validation score is within 0.01 of the best so far.</text>
 </svg>
