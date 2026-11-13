@@ -1,0 +1,18 @@
+# Versions Skanda-0 was trained and benchmarked with (NVIDIA PyTorch container, aarch64 / GB10).
+torch>=2.8
+transformers>=5.0
+peft>=0.17
+accelerate>=1.10
+safetensors>=0.6
+huggingface_hub
+numpy
+pillow
+scipy
+scikit-image
+tqdm
+torchvision
+# dataset builders
+nibabel
+pyarrow
+# int8 / int4 builds (skanda/quant.py)
+torchao

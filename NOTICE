@@ -1,0 +1,22 @@
+Skanda grounding (source code)
+Copyright 2026 Hithesh Karanth
+
+This repository's source code is licensed under the Apache License, Version 2.0 (see LICENSE).
+The Skanda-0 model weights are NOT part of this repository. They are published separately on Hugging Face
+(hitheshkaranth/Skanda-0) under CC BY-NC 4.0, with their own NOTICE.
+
+Research use only. Skanda is not a medical device and must not be used for clinical decisions.
+
+Third-party code
+- skanda/sam2.py is copied unchanged from ByteDance/Sa2VA-Qwen3-VL-4B (sam2.py, Apache License 2.0), which adapts
+  SAM 2 by Meta Platforms, Inc. (https://github.com/facebookresearch/sam2, Apache License 2.0).
+
+Models the code builds on (downloaded at run time, not redistributed here)
+- Qwen3-VL-30B-A3B-Instruct, Qwen team, Alibaba Cloud. Apache License 2.0.
+- Sa2VA-Qwen3-VL-4B, ByteDance. Apache License 2.0.
+
+Figures in docs/img/examples-*.svg contain downscaled images from:
+- NIH ChestX-ray14 (NIH Clinical Center), with ChestX-Det annotations (Apache License 2.0).
+  Wang X et al., CVPR 2017; Lian J et al., IEEE TMI 2021.
+- Medical Segmentation Decathlon, CC BY-SA 4.0. Antonelli M et al., Nature Communications 2022.
+- ISLES 2022, CC BY 4.0. Hernandez Petzsche MR et al., Scientific Data 2022.
